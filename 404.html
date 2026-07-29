@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!--
+  HALZZ WALL — GitHub Pages SPA routing fallback.
+
+  GitHub Pages has no server-side router, so a direct visit to a URL like
+  /@someuser/vid/abc123 would normally 404 — there's no real file at that
+  path. GitHub Pages does let you customize what shows for a 404 though,
+  so this page catches that, encodes the intended path into a query
+  string, and redirects to index.html, which reads it back out and
+  restores the clean URL in the address bar via history.replaceState.
+
+  This is a widely-used trick for single-page apps on GitHub Pages, not
+  anything custom to this project.
+-->
+<html>
+<head>
+<meta charset="UTF-8">
+<script>
+  var path = window.location.pathname + window.location.search;
+  window.location.replace('/index.html?redirect=' + encodeURIComponent(path));
+</script>
+</head>
+<body></body>
+</html>

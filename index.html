@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#efe9d8">
+<title>HALZZ WALL — loser core</title>
+<meta name="description" content="A feed for loser core videos. File your L.">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="topbar" id="topbar"></header>
+
+<main id="feed"></main>
+
+<nav class="bottomnav" id="bottomnav"></nav>
+
+<script>
+  // Restore the real path if we got bounced here by 404.html's redirect trick.
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    if (redirect) {
+      window.history.replaceState(null, "", redirect);
+    }
+  })();
+</script>
+
+<script type="module">
+  import { initAuth } from "/js/auth.js";
+  import { mountNav } from "/js/nav.js";
+  import { initFeed } from "/js/feed.js";
+
+  await initAuth();
+  mountNav("feed");
+  await initFeed();
+</script>
+
+</body>
+</html>
