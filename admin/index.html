@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin — HALZZ WALL</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="topbar" id="topbar"></header>
+
+<main class="container" id="adminMain" style="display:none">
+  <h1 class="stamp-font" style="font-size:20px; margin-bottom:16px;">Admin</h1>
+  <div class="admin-tabs" id="adminTabs"></div>
+  <div id="adminContent"></div>
+</main>
+
+<div id="adminGuard" class="center-screen" style="display:none">
+  <div class="empty-state">
+    <span class="stamp-font">RESTRICTED</span>
+    <p>This page is for admins and mods only.</p>
+  </div>
+</div>
+
+<script type="module">
+  import { initAuth, onAuthChange } from "/js/auth.js";
+  import { mountNav } from "/js/nav.js";
+  import { initAdmin } from "./admin.js";
+
+  await initAuth();
+  mountNav("admin");
+  onAuthChange(initAdmin);
+  await initAdmin();
+</script>
+
+</body>
+</html>
