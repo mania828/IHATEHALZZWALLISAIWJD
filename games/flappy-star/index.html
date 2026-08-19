@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0418">
+<title>Star Flight — HALZZWALL</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Fraunces:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0a0418; --ink:#f0eaff; --dim:#9d8fc9; --violet:#a78bfa; }
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+  html,body{height:100%;background:var(--bg);overflow:hidden}
+  body{ color:var(--ink); font-family:'Sora',sans-serif; display:flex; flex-direction:column; align-items:center; }
+  a{ color:inherit; text-decoration:none; }
+  button{ font-family:inherit; cursor:pointer; }
+  .top{ width:100%; max-width:460px; display:flex; align-items:center; justify-content:space-between; padding:16px 18px 8px; }
+  .back{ font-size:12.5px; color:var(--dim); } .back:hover{ color:var(--ink); }
+  .title{ font-family:'Fraunces',serif; font-style:italic; font-size:14px; color:var(--violet); }
+  .hud{ width:100%; max-width:460px; display:flex; justify-content:space-between; padding:4px 18px 10px; }
+  .hud .lbl{ color:var(--dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+  .hud .val{ color:var(--ink); font-size:19px; font-weight:700; }
+  #gameWrap{ width:100%; max-width:460px; flex:1; min-height:0; padding:0 10px 14px; display:flex; align-items:center; justify-content:center; }
+  #game{ width:100%; height:100%; max-height:100%; border-radius:16px; box-shadow:0 20px 50px -20px rgba(0,0,0,.6); display:block; touch-action:manipulation; }
+  #startScreen, #overScreen{
+    position:fixed; inset:0; z-index:20; background:rgba(10,4,24,.88); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  #overScreen{ display:none; }
+  .card{
+    max-width:340px; width:100%; text-align:center;
+    background:linear-gradient(165deg,rgba(20,16,52,.7),rgba(8,5,26,.8));
+    border:1px solid rgba(190,150,255,.2); border-radius:20px; padding:32px 26px;
+  }
+  .card h1{
+    font-weight:800; font-size:26px;
+    background:linear-gradient(160deg,#f6f0ff 20%,#cfaaff 55%,#8b5cf6 95%);
+    -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:10px;
+  }
+  .card p{ font-size:13.5px; color:var(--dim); line-height:1.6; margin-bottom:22px; }
+  .bigstat{ font-family:'Fraunces',serif; font-style:italic; font-size:15px; margin-bottom:4px; }
+  .playbtn{
+    display:inline-flex; align-items:center; gap:8px; padding:14px 30px; border-radius:100px;
+    background:linear-gradient(160deg,#c084fc,#7c3aed); border:none; color:#0a0418; font-weight:700; font-size:14px;
+    box-shadow:0 10px 30px -8px rgba(160,110,255,.6);
+  }
+</style>
+</head>
+<body>
+
+<div class="top"><a href="/games/" class="back">&larr; games</a><span class="title">star flight</span></div>
+<div class="hud">
+  <div><div class="lbl">Score</div><div class="val" id="hudScore">0</div></div>
+  <div><div class="lbl">Best</div><div class="val" id="hudBest">0</div></div>
+</div>
+<div id="gameWrap"><canvas id="game"></canvas></div>
+
+<div id="startScreen">
+  <div class="card">
+    <h1>Star Flight</h1>
+    <p>Tap, click, or space to flap upward. Gravity pulls you down the rest of the time. Weave through the gaps.</p>
+    <button class="playbtn" id="startBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="#0a0418"><path d="M8 5v14l11-7z"/></svg>Play</button>
+  </div>
+</div>
+<div id="overScreen">
+  <div class="card">
+    <h1>Down you go</h1>
+    <div class="bigstat" id="finalScore">0</div>
+    <p id="finalMsg"></p>
+    <button class="playbtn" id="retryBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="#0a0418"><path d="M8 5v14l11-7z"/></svg>Try again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('gameWrap');
+  let W=0,H=0,DPR=Math.min(devicePixelRatio||1,2);
+
+  function resize(){
+    const r = wrap.getBoundingClientRect();
+    const w=r.width-20, h=r.height-14;
+    canvas.style.width=w+'px'; canvas.style.height=h+'px';
+    canvas.width=w*DPR; canvas.height=h*DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    W=w; H=h;
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  const GRAVITY = 0.0011, FLAP = -0.34, GAP = 155, PIPE_W = 54;
+  let star, pipes, score, best, playing, speed, spawnTimer;
+  best = Number(localStorage.getItem('starFlightBest')||0);
+  document.getElementById('hudBest').textContent = best;
+
+  function reset(){
+    star = { x: 70, y: H/2, vy: 0, r: 13, rot:0 };
+    pipes = [];
+    score = 0; speed = 0.16; spawnTimer = 0;
+    playing = true;
+  }
+
+  function flap(){
+    if (!playing) return;
+    star.vy = FLAP;
+  }
+
+  function spawnPipe(){
+    const margin = 50;
+    const gapY = margin + Math.random()*(H - margin*2 - GAP);
+    pipes.push({ x: W+40, gapY, scored:false });
+  }
+
+  function update(dt){
+    star.vy += GRAVITY*dt;
+    star.y += star.vy*dt;
+    star.rot = Math.max(-0.5, Math.min(1.1, star.vy*0.9));
+
+    if (star.y - star.r < 0 || star.y + star.r > H){ crash(); return; }
+
+    spawnTimer -= dt;
+    if (spawnTimer <= 0){ spawnPipe(); spawnTimer = 1500 - Math.min(500, score*15); }
+
+    for (const p of pipes){
+      p.x -= speed*dt;
+      if (!p.scored && p.x + PIPE_W < star.x){
+        p.scored = true; score += 1;
+        document.getElementById('hudScore').textContent = score;
+        speed = 0.16 + Math.min(0.14, score*0.004);
+      }
+      const withinX = star.x + star.r > p.x && star.x - star.r < p.x + PIPE_W;
+      const withinGap = star.y - star.r > p.gapY && star.y + star.r < p.gapY + GAP;
+      if (withinX && !withinGap){ crash(); return; }
+    }
+    pipes = pipes.filter(p => p.x > -80);
+  }
+
+  function crash(){
+    playing = false;
+    if (score > best){ best = score; localStorage.setItem('starFlightBest', String(best)); document.getElementById('hudBest').textContent = best; }
+    document.getElementById('finalScore').textContent = score;
+    const msgs = ["Gravity always wins.", "So close.", "Try leading the gap a little earlier."];
+    document.getElementById('finalMsg').textContent = msgs[Math.floor(Math.random()*msgs.length)];
+    setTimeout(()=>{ document.getElementById('overScreen').style.display='flex'; }, 300);
+  }
+
+  function drawStarShape(x,y,r,rot,fill){
+    ctx.save();
+    ctx.translate(x,y); ctx.rotate(rot);
+    ctx.beginPath();
+    for (let i=0;i<5;i++){
+      const a1 = -Math.PI/2 + i*(Math.PI*2/5);
+      const a2 = a1 + Math.PI/5;
+      ctx.lineTo(Math.cos(a1)*r, Math.sin(a1)*r);
+      ctx.lineTo(Math.cos(a2)*r*0.45, Math.sin(a2)*r*0.45);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'#140a2e'); grad.addColorStop(1,'#08040f');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+    for (const p of pipes){
+      const g = ctx.createLinearGradient(p.x,0,p.x+PIPE_W,0);
+      g.addColorStop(0,'#7c3aed'); g.addColorStop(1,'#c084fc');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x, 0, PIPE_W, p.gapY);
+      ctx.fillRect(p.x, p.gapY+GAP, PIPE_W, H-(p.gapY+GAP));
+    }
+
+    drawStarShape(star.x, star.y, star.r, star.rot, '#ffd166');
+  }
+
+  let last=0;
+  function loop(t){
+    const dt = last ? Math.min(40,t-last) : 16;
+    last = t;
+    if (playing) update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function startGame(){
+    reset();
+    document.getElementById('startScreen').style.display='none';
+    document.getElementById('overScreen').style.display='none';
+    document.getElementById('hudScore').textContent='0';
+  }
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+  canvas.addEventListener('pointerdown', flap);
+  addEventListener('keydown', (e)=>{ if (e.code==='Space'){ e.preventDefault(); flap(); } });
+})();
+</script>
+</body>
+</html>
