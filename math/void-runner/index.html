@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0418">
+<script src="/math/settings.js"></script>
+<title>Void Runner — HALZZWALL</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Fraunces:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0a0418; --ink:#f0eaff; --dim:#9d8fc9; --violet:#a78bfa; }
+  *{margin:0;padding:0;box-sizing:border-box;
+    user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;-webkit-touch-callout:none;
+  }
+  html,body{height:100%;background:var(--bg);overflow:hidden}
+  body{
+    color:var(--ink); font-family:'Sora',sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  a{ color:inherit; text-decoration:none; }
+  button{ font-family:inherit; cursor:pointer; }
+
+  .top{ width:100%; max-width:1000px; display:flex; align-items:center; justify-content:space-between; padding:16px 18px 8px; }
+  .back{ font-size:12.5px; color:var(--dim); }
+  .back:hover{ color:var(--ink); }
+  .title{ font-family:'Fraunces',serif; font-style:italic; font-size:14px; color:var(--violet); }
+
+  .hud{ width:100%; max-width:1000px; display:flex; justify-content:space-between; padding:4px 18px 10px; }
+  .hud .lbl{ color:var(--dim); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; }
+  .hud .val{ color:var(--ink); font-size:19px; font-weight:700; }
+
+  #gameWrap{ position:relative; width:100%; max-width:1000px; flex:1; min-height:0; padding:0 10px 14px; display:flex; align-items:center; justify-content:center; }
+  #game{ width:100%; height:100%; max-height:100%; border-radius:16px; box-shadow:0 20px 50px -20px rgba(0,0,0,.6); display:block; touch-action:manipulation; }
+
+  #startScreen, #overScreen{
+    position:fixed; inset:0; z-index:20; background:rgba(10,4,24,.88); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  #overScreen{ display:none; }
+  .card{
+    max-width:340px; width:100%; text-align:center;
+    background:linear-gradient(165deg,rgba(20,16,52,.7),rgba(8,5,26,.8));
+    border:1px solid rgba(190,150,255,.2); border-radius:20px; padding:32px 26px;
+  }
+  .card h1{
+    font-weight:800; font-size:26px; letter-spacing:-0.01em;
+    background:linear-gradient(160deg,#f6f0ff 20%,#cfaaff 55%,#8b5cf6 95%);
+    -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:10px;
+  }
+  .card p{ font-size:13.5px; color:var(--dim); line-height:1.6; margin-bottom:22px; }
+  .bigstat{ font-family:'Fraunces',serif; font-style:italic; font-size:15px; margin-bottom:4px; }
+  .playbtn{
+    display:inline-flex; align-items:center; gap:8px; padding:14px 30px; border-radius:100px;
+    background:linear-gradient(160deg,#c084fc,#7c3aed); border:none; color:#0a0418; font-weight:700; font-size:14px;
+    box-shadow:0 10px 30px -8px rgba(160,110,255,.6);
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a href="/math/" class="back">&larr; games</a>
+  <span class="title">void runner</span>
+</div>
+
+<div class="hud">
+  <div><div class="lbl">Distance</div><div class="val" id="hudScore">0</div></div>
+  <div><div class="lbl">Best</div><div class="val" id="hudBest">0</div></div>
+</div>
+
+<div id="gameWrap"><canvas id="game"></canvas></div>
+
+<div id="startScreen">
+  <div class="card">
+    <h1>Void Runner</h1>
+    <p>Click, or hit space to jump. Clear the spikes and clear the gaps — one touch on either and it's over.</p>
+    <button class="playbtn" id="startBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#0a0418"><path d="M8 5v14l11-7z"/></svg>
+      Play
+    </button>
+  </div>
+</div>
+
+<div id="overScreen">
+  <div class="card">
+    <h1>Crashed</h1>
+    <div class="bigstat" id="finalScore">0m</div>
+    <p id="finalMsg"></p>
+    <button class="playbtn" id="retryBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#0a0418"><path d="M8 5v14l11-7z"/></svg>
+      Try again
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('gameWrap');
+  let W=0, H=0, DPR = Math.min(devicePixelRatio||1, 2);
+
+  function resize(){
+    const r = wrap.getBoundingClientRect();
+    const w = r.width - 20, h = r.height - 14;
+    canvas.style.width = w+'px'; canvas.style.height = h+'px';
+    canvas.width = w*DPR; canvas.height = h*DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    W=w; H=h;
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  const GROUND_Y_FRAC = 0.72;
+  let groundY;
+
+  const player = { x: 90, y: 0, size: 28, vy: 0, onGround: true, rot: 0 };
+  const GRAVITY = 0.0026;
+  const JUMP_V = -0.72;
+
+  let obstacles = [];
+  let speed = 0.34;          // px/ms
+  let baseSpeed = 0.34;
+  let distance = 0;
+  let playing = false;
+  let dead = false;
+  let lastTime = 0;
+  let spawnTimer = 0;
+  let best = Number(localStorage.getItem('voidRunnerBest') || 0);
+  document.getElementById('hudBest').textContent = Math.floor(best) + 'm';
+
+  const particles = [];
+
+  function reset(){
+    groundY = H * GROUND_Y_FRAC;
+    player.y = groundY - player.size;
+    player.vy = 0;
+    player.onGround = true;
+    player.rot = 0;
+    obstacles = [];
+    speed = baseSpeed;
+    distance = 0;
+    spawnTimer = 600;
+    dead = false;
+    particles.length = 0;
+  }
+
+  function jump(){
+    if (!playing) return;
+    if (player.onGround){
+      player.vy = JUMP_V;
+      player.onGround = false;
+    }
+  }
+
+  function spawnObstacle(){
+    const type = Math.random();
+    if (type < 0.62){
+      obstacles.push({ type:'spike', x: W + 40, w: 30, h: 34 });
+    } else {
+      const gap = 90 + Math.random()*40;
+      obstacles.push({ type:'gap', x: W + 40, w: gap });
+    }
+  }
+
+  function update(dt){
+    distance += speed * dt * 0.06;
+    speed = baseSpeed + Math.min(0.28, distance * 0.0009);
+
+    player.vy += GRAVITY * dt;
+    player.y += player.vy * dt;
+
+    // find if standing over a gap
+    let overGap = false;
+    for (const o of obstacles){
+      if (o.type === 'gap' && player.x + player.size*0.3 > o.x && player.x + player.size*0.3 < o.x + o.w){
+        overGap = true;
+      }
+    }
+
+    const floorY = overGap ? H + 100 : groundY;
+
+    if (player.y + player.size >= floorY){
+      if (overGap){
+        crash();
+        return;
+      }
+      player.y = floorY - player.size;
+      player.vy = 0;
+      player.onGround = true;
+      player.rot = Math.round(player.rot / (Math.PI/2)) * (Math.PI/2);
+    } else {
+      player.onGround = false;
+      player.rot += 0.012 * dt;
+    }
+
+    // particles trail
+    if (Math.random() < 0.5){
+      particles.push({ x: player.x, y: player.y+player.size/2, vx: -0.15-Math.random()*0.1, life: 400, maxLife:400 });
+    }
+    for (let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.x += p.vx*dt; p.life -= dt;
+      if (p.life <= 0) particles.splice(i,1);
+    }
+
+    spawnTimer -= dt;
+    if (spawnTimer <= 0){
+      spawnObstacle();
+      spawnTimer = Math.max(650, 1150 - distance*1.2) + Math.random()*250;
+    }
+
+    for (let i=obstacles.length-1;i>=0;i--){
+      const o = obstacles[i];
+      o.x -= speed * dt;
+      if (o.x + (o.w||0) < -60) obstacles.splice(i,1);
+
+      if (o.type === 'spike'){
+        const px = player.x, py = player.y, ps = player.size;
+        const topY = groundY - o.h;
+        if (px+ps*0.75 > o.x+6 && px+ps*0.25 < o.x+o.w-6 && py+ps > topY+6){
+          crash(); return;
+        }
+      }
+    }
+  }
+
+  function crash(){
+    playing = false;
+    dead = true;
+    const dist = Math.floor(distance);
+    if (dist > best){
+      best = dist;
+      localStorage.setItem('voidRunnerBest', String(best));
+    }
+    document.getElementById('finalScore').textContent = dist + 'm';
+    document.getElementById('hudBest').textContent = Math.floor(best) + 'm';
+    const msgs = ["So close. Or not.", "The void wins again.", "Right into it."];
+    document.getElementById('finalMsg').textContent = msgs[Math.floor(Math.random()*msgs.length)];
+    setTimeout(() => { document.getElementById('overScreen').style.display = 'flex'; }, 300);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0, '#140a2e');
+    grad.addColorStop(1, '#08040f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    // parallax grid lines
+    ctx.strokeStyle = 'rgba(139,92,246,0.12)';
+    ctx.lineWidth = 1;
+    const gridOffset = (distance*40) % 40;
+    for (let x = -gridOffset; x < W; x += 40){
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+
+    // ground
+    ctx.fillStyle = '#1c1030';
+    ctx.fillRect(0, groundY, W, H-groundY);
+    ctx.strokeStyle = 'rgba(196,162,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+    // particles
+    for (const p of particles){
+      ctx.globalAlpha = p.life / p.maxLife * 0.5;
+      ctx.fillStyle = '#c084fc';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // obstacles
+    for (const o of obstacles){
+      if (o.type === 'spike'){
+        ctx.beginPath();
+        ctx.moveTo(o.x, groundY);
+        ctx.lineTo(o.x + o.w/2, groundY - o.h);
+        ctx.lineTo(o.x + o.w, groundY);
+        ctx.closePath();
+        ctx.fillStyle = '#ff5959';
+        ctx.fill();
+        ctx.strokeStyle = '#ffb0b0'; ctx.lineWidth = 1.5; ctx.stroke();
+      } else if (o.type === 'gap'){
+        ctx.fillStyle = '#08040f';
+        ctx.fillRect(o.x, groundY, o.w, H-groundY);
+      }
+    }
+
+    // player
+    ctx.save();
+    ctx.translate(player.x + player.size/2, player.y + player.size/2);
+    ctx.rotate(player.rot);
+    const grad2 = ctx.createLinearGradient(-player.size/2,-player.size/2,player.size/2,player.size/2);
+    grad2.addColorStop(0, '#c084fc');
+    grad2.addColorStop(1, '#7c3aed');
+    ctx.fillStyle = grad2;
+    ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
+    ctx.strokeStyle = '#f0eaff'; ctx.lineWidth = 2;
+    ctx.strokeRect(-player.size/2, -player.size/2, player.size, player.size);
+    ctx.restore();
+
+    document.getElementById('hudScore').textContent = Math.floor(distance) + 'm';
+  }
+
+  function loop(t){
+    const dt = lastTime ? Math.min(40, t - lastTime) : 16;
+    lastTime = t;
+    if (playing) update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function startGame(){
+    reset();
+    playing = true;
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('overScreen').style.display = 'none';
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+  canvas.addEventListener('pointerdown', jump);
+  addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); jump(); } });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0418">
+<script src="/math/settings.js"></script>
+<title>Settings — HALZZWALL</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Fraunces:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0418; --bg-deep:#0a0418; --ink:#f0eaff; --dim:#9d8fc9; --violet:#a78bfa;
+    --surface:rgba(20,16,52,.55); --border:rgba(190,150,255,.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:'Sora',sans-serif;
+    transition:background .25s ease, color .25s ease;
+  }
+  a{ color:inherit; text-decoration:none; }
+  button{ font-family:inherit; cursor:pointer; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 26px; border-bottom:1px solid var(--border);
+  }
+  .wordmark{ font-weight:800; font-size:19px; letter-spacing:-0.02em; }
+  .wordmark span{ color:var(--violet); }
+  .back{ font-size:12.5px; color:var(--dim); }
+  .back:hover{ color:var(--ink); }
+
+  .container{ max-width:720px; margin:0 auto; padding:40px 26px 80px; }
+  h1{
+    font-weight:800; font-size:clamp(26px,4vw,36px); letter-spacing:-0.01em; margin-bottom:8px;
+  }
+  .sub{ font-size:13.5px; color:var(--dim); margin-bottom:40px; }
+
+  .section{ margin-bottom:42px; }
+  .section-title{
+    font-family:'Fraunces',serif; font-style:italic; font-size:16px; color:var(--violet); margin-bottom:16px;
+  }
+
+  .theme-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:14px;
+  }
+  .theme-card{
+    position:relative; border-radius:14px; border:2px solid var(--border);
+    padding:16px; cursor:pointer; transition:border-color .2s ease, transform .2s ease;
+    background:var(--surface);
+  }
+  .theme-card:hover{ transform:translateY(-2px); }
+  .theme-card.active{ border-color:var(--violet); }
+  .swatch{
+    width:100%; height:52px; border-radius:8px; margin-bottom:10px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .swatch span{ width:14px; height:14px; border-radius:50%; }
+  .theme-name{ font-size:13px; font-weight:700; }
+  .theme-check{
+    position:absolute; top:10px; right:10px; width:18px; height:18px; border-radius:50%;
+    background:var(--violet); color:#fff; display:none; align-items:center; justify-content:center; font-size:11px;
+  }
+  .theme-card.active .theme-check{ display:flex; }
+
+  .scale-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .scale-btn{
+    padding:12px 20px; border-radius:100px; border:2px solid var(--border);
+    background:var(--surface); color:var(--ink); font-weight:600; font-size:13.5px;
+    transition:border-color .2s ease, transform .2s ease;
+  }
+  .scale-btn:hover{ transform:translateY(-2px); }
+  .scale-btn.active{ border-color:var(--violet); color:var(--violet); }
+
+  .preview{
+    margin-top:18px; padding:20px; border-radius:14px; border:1px solid var(--border); background:var(--surface);
+  }
+  .preview .card-title{ font-size:15px; font-weight:700; margin-bottom:4px; }
+  .preview .card-meta{ font-size:12px; color:var(--dim); }
+  .preview .btn{
+    margin-top:14px; display:inline-flex; padding:10px 20px; border-radius:100px;
+    background:linear-gradient(160deg, var(--violet), var(--violet)); color:#fff; font-size:13px; font-weight:700;
+  }
+
+  :focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/math/" class="wordmark">HALZZWALL<span>.</span></a>
+  <a href="/math/" class="back">&larr; back to games</a>
+</header>
+
+<div class="container">
+  <h1>Settings</h1>
+  <p class="sub">These apply across every page — the hub and every game.</p>
+
+  <div class="section">
+    <div class="section-title">Theme</div>
+    <div class="theme-grid" id="themeGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Text &amp; UI size</div>
+    <div class="scale-row" id="scaleRow"></div>
+  </div>
+
+  <div class="preview">
+    <div class="card-title">Live preview</div>
+    <div class="card-meta">This box updates instantly as you change settings above.</div>
+    <div class="btn">Sample button</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const THEMES = window.HALZZ_SETTINGS.THEMES;
+  const SCALES = window.HALZZ_SETTINGS.SCALES;
+
+  const THEME_LABELS = { sunlight: 'Sunlight', dark: 'Dark', night: 'Night', sunset: 'Sunset' };
+  const SCALE_LABELS = { small: 'Small', normal: 'Normal', large: 'Large', xl: 'Extra large' };
+
+  function currentTheme(){ return localStorage.getItem('mathTheme') || 'dark'; }
+  function currentScale(){ return localStorage.getItem('mathTextScale') || 'normal'; }
+
+  function renderThemes(){
+    const grid = document.getElementById('themeGrid');
+    const active = currentTheme();
+    grid.innerHTML = Object.keys(THEMES).map(key => {
+      const t = THEMES[key];
+      return `
+        <div class="theme-card ${key===active?'active':''}" data-theme="${key}">
+          <div class="theme-check">&check;</div>
+          <div class="swatch" style="background:${t.bg}">
+            <span style="background:${t.violet}"></span>
+            <span style="background:${t.ink}"></span>
+          </div>
+          <div class="theme-name">${THEME_LABELS[key]}</div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.theme-card').forEach(el => {
+      el.addEventListener('click', () => {
+        localStorage.setItem('mathTheme', el.dataset.theme);
+        window.HALZZ_SETTINGS.apply();
+        renderThemes();
+      });
+    });
+  }
+
+  function renderScales(){
+    const row = document.getElementById('scaleRow');
+    const active = currentScale();
+    row.innerHTML = Object.keys(SCALES).map(key => `
+      <button class="scale-btn ${key===active?'active':''}" data-scale="${key}">${SCALE_LABELS[key]}</button>
+    `).join('');
+
+    row.querySelectorAll('.scale-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        localStorage.setItem('mathTextScale', btn.dataset.scale);
+        window.HALZZ_SETTINGS.apply();
+        renderScales();
+      });
+    });
+  }
+
+  renderThemes();
+  renderScales();
+})();
+</script>
+
+</body>
+</html>
